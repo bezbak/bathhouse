@@ -1,0 +1,8 @@
+<form method="post" class="max-w-sm mx-auto mt-10">
+  {% csrf_token %}
+  <select name="venue_type" class="border p-2 w-full mb-2">
+    <option value="bath">Баня</option>
+    <option value="cafe">Кафе</option>
+  </select>
+  <button type="submit" class="bg-green-500 text-white p-2 w-full">Выбрать</button>
+</form>

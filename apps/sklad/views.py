@@ -1,20 +1,31 @@
-from django.shortcuts import render
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
-from django.utils.dateparse import parse_datetime
-from .models import Reservation
+from rest_framework import generics, filters
+from rest_framework.permissions import IsAuthenticated
+from .serializers import TimeSlotSerializer, ReservationSerializer, ClientSerializer
+from .models import Reservation, TimeSlot, Client
 
-@api_view(['POST'])
-@permission_classes([AllowAny])  # или ограничьте токеном
-def create_reservation(request):
-    data = request.data
-    r = Reservation.objects.create(
-        name=data.get('name'),
-        people=int(data.get('people', 0)),
-        requested_time=parse_datetime(data.get('requested_time')),
-        phone=data.get('phone'),
-        source=data.get('source', 'salebot'),
-        idempotency_key=data.get('idempotency_key')
-    )
-    return Response({"ok": True, "reservation_id": r.id})
+
+class TimeSlotListCreate(generics.ListCreateAPIView):
+    queryset = TimeSlot.objects.all()
+    serializer_class = TimeSlotSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class ReservationList(generics.ListAPIView):
+    queryset = Reservation.objects.select_related(
+        'client', 'venue', 'timeslot').all()
+    serializer_class = ReservationSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'phone', 'client__phone']
+
+
+class ReservationDetail(generics.RetrieveUpdateAPIView):
+    queryset = Reservation.objects.all()
+    serializer_class = ReservationSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class ClientsList(generics.ListAPIView):
+    queryset = Client.objects.all()
+    serializer_class = ClientSerializer
+    permission_classes = [IsAuthenticated]
