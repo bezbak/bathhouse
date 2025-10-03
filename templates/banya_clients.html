@@ -1,0 +1,89 @@
+{% extends "banya_base.html" %}
+{% block banya_content %}
+<h1 class="text-2xl font-bold mb-4">Клиенты</h1>
+
+<button id="openClientModal"
+        class="mb-4 px-4 py-2 rounded bg-green-500 text-white">Добавить клиента</button>
+
+<div id="clientModal" class="fixed inset-0 hidden bg-black/50 flex items-center justify-center">
+  <div class="bg-white text-black rounded-xl p-6 w-96">
+    <h2 class="text-xl font-bold mb-4">Новый клиент</h2>
+    <form id="clientForm" class="space-y-3">
+      {% csrf_token %}
+      <input type="text" name="name" placeholder="Имя"
+             class="w-full border rounded px-3 py-2" required>
+      <input type="text" name="phone_number" placeholder="Телефон"
+             class="w-full border rounded px-3 py-2" required>
+      <div class="flex gap-3 justify-end">
+        <button type="button" id="closeClientModal"
+                class="px-3 py-2 rounded bg-gray-300">Отмена</button>
+        <button type="submit"
+                class="px-3 py-2 rounded bg-green-500 text-white">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<table id="clientsTable" class="w-full text-left bg-white/10 rounded-xl border border-white/20">
+  <thead class="bg-white/20">
+    <tr>
+      <th class="px-4 py-2">Имя</th>
+      <th class="px-4 py-2">Телефон</th>
+      <th class="px-4 py-2">Визиты</th>
+      <th class="px-4 py-2">Затраты</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+  function loadClients(){
+    $.getJSON("banya/api/v1/clients/", function(data){
+      const tbody = $("#clientsTable tbody");
+      tbody.empty();
+      data.forEach(c => {
+        tbody.append(`
+          <tr class="border-t border-white/10">
+            <td class="px-4 py-2">${c.name}</td>
+            <td class="px-4 py-2">${c.phone_number}</td>
+            <td class="px-4 py-2">${c.total_visits}</td>
+            <td class="px-4 py-2">${c.total_spent}</td>
+          </tr>
+        `);
+      });
+    });
+  }
+
+  loadClients();
+
+  // открыть/закрыть модалку
+  $("#openClientModal").on("click", ()=>$("#clientModal").removeClass("hidden"));
+  $("#closeClientModal").on("click", ()=>$("#clientModal").addClass("hidden"));
+
+  // отправка формы
+  $("#clientForm").on("submit", function(e){
+    e.preventDefault();
+    const payload = {
+      name: $(this).find("input[name='name']").val(),
+      phone_number: $(this).find("input[name='phone_number']").val()
+    };
+
+    $.ajax({
+      url: "banya/api/v1/clients/",
+      method: "POST",
+      data: JSON.stringify(payload),
+      contentType: "application/json",
+      headers: {"X-CSRFToken": csrftoken()},
+      success: function(){
+        $("#clientModal").addClass("hidden");
+        loadClients();
+      },
+      error: function(xhr){
+        alert("Ошибка: "+xhr.status);
+      }
+    });
+  });
+</script>
+{% endblock %}

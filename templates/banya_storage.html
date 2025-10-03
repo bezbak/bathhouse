@@ -1,0 +1,123 @@
+{% extends "banya_base.html" %}
+{% block banya_content %}
+<h1 class="text-2xl font-bold mb-4">Склад</h1>
+
+{% if request.user.role == "admin" %}
+<button id="openProductModal"
+        class="mb-4 px-4 py-2 rounded bg-green-500 text-white">Добавить продукт</button>
+{% endif %}
+
+<div id="productModal" class="fixed inset-0 hidden bg-black/50 flex items-center justify-center">
+  <div class="bg-white text-black rounded-xl p-6 w-96">
+    <h2 class="text-xl font-bold mb-4" id="productModalTitle">Новый продукт</h2>
+    <form id="productForm" class="space-y-3">
+      {% csrf_token %}
+      <input type="hidden" name="id">
+      <input type="text" name="name" placeholder="Название" class="w-full border rounded px-3 py-2" required>
+      <input type="text" name="supplier" placeholder="Поставщик" class="w-full border rounded px-3 py-2" required>
+      <input type="number" step="0.01" name="purchase_price" placeholder="Цена закупки" class="w-full border rounded px-3 py-2" required>
+      <input type="number" step="0.01" name="sale_price" placeholder="Цена продажи" class="w-full border rounded px-3 py-2" required>
+      <input type="number" name="quantity" placeholder="Количество" class="w-full border rounded px-3 py-2" required>
+      <div class="flex gap-3 justify-end">
+        <button type="button" id="closeProductModal" class="px-3 py-2 rounded bg-gray-300">Отмена</button>
+        <button type="submit" class="px-3 py-2 rounded bg-green-500 text-white">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<table id="storageTable" class="w-full text-left bg-white/10 rounded-xl border border-white/20">
+  <thead class="bg-white/20">
+    <tr>
+      <th class="px-4 py-2">Название</th>
+      <th class="px-4 py-2">Поставщик</th>
+      <th class="px-4 py-2">Закупка</th>
+      <th class="px-4 py-2">Продажа</th>
+      <th class="px-4 py-2">Остаток</th>
+      {% if request.user.role == "admin" %}<th class="px-4 py-2">Действия</th>{% endif %}
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+  function loadProducts(){
+    $.getJSON(apiUrl(`banya/api/v1/products/`), function(data){
+      const tbody = $("#storageTable tbody");
+      tbody.empty();
+      data.forEach(p => {
+        tbody.append(`
+          <tr class="border-t border-white/10">
+            <td class="px-4 py-2">${p.name}</td>
+            <td class="px-4 py-2">${p.supplier}</td>
+            <td class="px-4 py-2">${p.purchase_price}</td>
+            <td class="px-4 py-2">${p.sale_price}</td>
+            <td class="px-4 py-2">${p.quantity}</td>
+            {% if request.user.role == "admin" %}
+            <td class="px-4 py-2 flex gap-2">
+              <button onclick="editProduct(${p.id}, '${p.name}', '${p.supplier}', ${p.purchase_price}, ${p.sale_price}, ${p.quantity})"
+                class="px-2 py-1 rounded bg-yellow-500 text-white">✎</button>
+              <button onclick="deleteProduct(${p.id})" class="px-2 py-1 rounded bg-red-500 text-white">✕</button>
+            </td>
+            {% endif %}
+          </tr>
+        `);
+      });
+    });
+  }
+  loadProducts();
+
+  function deleteProduct(id){
+    $.ajax({
+      url: apiUrl(`banya/api/v1/products/`),
+      method: "DELETE",
+      headers: {"X-CSRFToken": csrftoken()},
+      success: loadProducts
+    });
+  }
+
+  function editProduct(id, name, supplier, pp, sp, qty){
+    $("#productModalTitle").text("Редактировать продукт");
+    $("#productForm input[name='id']").val(id);
+    $("#productForm input[name='name']").val(name);
+    $("#productForm input[name='supplier']").val(supplier);
+    $("#productForm input[name='purchase_price']").val(pp);
+    $("#productForm input[name='sale_price']").val(sp);
+    $("#productForm input[name='quantity']").val(qty);
+    $("#productModal").removeClass("hidden");
+  }
+
+  $("#openProductModal").on("click", ()=>{
+    $("#productModalTitle").text("Новый продукт");
+    $("#productForm")[0].reset();
+    $("#productForm input[name='id']").val("");
+    $("#productModal").removeClass("hidden");
+  });
+  $("#closeProductModal").on("click", ()=>$("#productModal").addClass("hidden"));
+
+  $("#productForm").on("submit", function(e){
+    e.preventDefault();
+    const id = $(this).find("input[name='id']").val();
+    const payload = {
+      name: $(this).find("input[name='name']").val(),
+      supplier: $(this).find("input[name='supplier']").val(),
+      purchase_price: $(this).find("input[name='purchase_price']").val(),
+      sale_price: $(this).find("input[name='sale_price']").val(),
+      quantity: $(this).find("input[name='quantity']").val()
+    };
+    $.ajax({
+      url: id ? apiUrl(`banya/api/v1/products/${id}/`) : apiUrl(`banya/api/v1/products/`),
+      method: id ? "PUT" : "POST",
+      data: JSON.stringify(payload),
+      contentType: "application/json",
+      headers: {"X-CSRFToken": csrftoken()},
+      success: function(){
+        $("#productModal").addClass("hidden");
+        loadProducts();
+      }
+    });
+  });
+</script>
+{% endblock %}

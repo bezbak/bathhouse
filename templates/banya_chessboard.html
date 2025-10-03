@@ -1,0 +1,118 @@
+{% extends "banya_base.html" %}
+{% block banya_content %}
+<h1 class="text-2xl font-bold mb-4">Шахматка</h1>
+
+<button id="openBookingModal"
+        class="mb-4 px-4 py-2 rounded bg-green-500 text-white">Добавить бронирование</button>
+
+<!-- Модалка -->
+<div id="bookingModal" class="fixed inset-0 hidden bg-black/50 flex items-center justify-center">
+  <div class="bg-white text-black rounded-xl p-6 w-96">
+    <h2 class="text-xl font-bold mb-4" id="bookingModalTitle">Новое бронирование</h2>
+    <form id="bookingForm" class="space-y-3">
+      {% csrf_token %}
+      <input type="hidden" name="id">
+      <input type="text" name="client_name" placeholder="Имя клиента" class="w-full border rounded px-3 py-2" required>
+      <input type="text" name="phone_number" placeholder="Телефон" class="w-full border rounded px-3 py-2" required>
+      <input type="number" name="people_count" placeholder="Кол-во людей" class="w-full border rounded px-3 py-2" required>
+      <input type="datetime-local" name="arrival_time" class="w-full border rounded px-3 py-2" required>
+      <div class="flex gap-3 justify-end">
+        <button type="button" id="closeBookingModal" class="px-3 py-2 rounded bg-gray-300">Отмена</button>
+        <button type="submit" class="px-3 py-2 rounded bg-green-500 text-white">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<table id="bookingTable" class="w-full text-left bg-white/10 rounded-xl border border-white/20">
+  <thead class="bg-white/20">
+    <tr>
+      <th class="px-4 py-2">Имя</th>
+      <th class="px-4 py-2">Телефон</th>
+      <th class="px-4 py-2">Статус</th>
+      <th class="px-4 py-2">Кол-во</th>
+      <th class="px-4 py-2">Время</th>
+      <th class="px-4 py-2">Действия</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+  function loadBookings(){
+    $.getJSON("{% url 'booking-list' %}", function(data){
+      const tbody = $("#bookingTable tbody");
+      tbody.empty();
+      data.forEach(b => {
+        tbody.append(`
+          <tr class="border-t border-white/10">
+            <td class="px-4 py-2">${b.client_name}</td>
+            <td class="px-4 py-2">${b.phone_number}</td>
+            <td class="px-4 py-2">${b.status}</td>
+            <td class="px-4 py-2">${b.people_count}</td>
+            <td class="px-4 py-2">${b.arrival_time}</td>
+            <td class="px-4 py-2 flex gap-2">
+              <button onclick="editBooking(${b.id}, '${b.client_name}', '${b.phone_number}', ${b.people_count}, '${b.arrival_time}')"
+                class="px-2 py-1 rounded bg-yellow-500 text-white">✎</button>
+              <button onclick="deleteBooking(${b.id})"
+                class="px-2 py-1 rounded bg-red-500 text-white">✕</button>
+            </td>
+          </tr>
+        `);
+      });
+    });
+  }
+  loadBookings();
+
+  function deleteBooking(id){
+    $.ajax({
+      url: `banya/api/v1/bookings/${id}/`,
+      method: "DELETE",
+      headers: {"X-CSRFToken": csrftoken()},
+      success: loadBookings
+    });
+  }
+
+  function editBooking(id, name, phone, people, time){
+    $("#bookingModalTitle").text("Редактировать бронирование");
+    $("#bookingForm input[name='id']").val(id);
+    $("#bookingForm input[name='client_name']").val(name);
+    $("#bookingForm input[name='phone_number']").val(phone);
+    $("#bookingForm input[name='people_count']").val(people);
+    $("#bookingForm input[name='arrival_time']").val(time.replace(" ", "T"));
+    $("#bookingModal").removeClass("hidden");
+  }
+
+  $("#openBookingModal").on("click", ()=>{
+    $("#bookingModalTitle").text("Новое бронирование");
+    $("#bookingForm")[0].reset();
+    $("#bookingForm input[name='id']").val("");
+    $("#bookingModal").removeClass("hidden");
+  });
+  $("#closeBookingModal").on("click", ()=>$("#bookingModal").addClass("hidden"));
+
+  $("#bookingForm").on("submit", function(e){
+    e.preventDefault();
+    const id = $(this).find("input[name='id']").val();
+    const payload = {
+      client_name: $(this).find("input[name='client_name']").val(),
+      phone_number: $(this).find("input[name='phone_number']").val(),
+      people_count: $(this).find("input[name='people_count']").val(),
+      arrival_time: $(this).find("input[name='arrival_time']").val()
+    };
+    $.ajax({
+      url: id ? `banya/api/v1/bookings/${id}/` : "{% url 'booking-list' %}",
+      method: id ? "PUT" : "POST",
+      data: JSON.stringify(payload),
+      contentType: "application/json",
+      headers: {"X-CSRFToken": csrftoken()},
+      success: function(){
+        $("#bookingModal").addClass("hidden");
+        loadBookings();
+      }
+    });
+  });
+</script>
+{% endblock %}

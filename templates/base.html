@@ -1,0 +1,92 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>
+      {% block title %}
+        Avala
+      {% endblock %}
+    </title>
+        <style>
+        body::before{
+            content:"";
+            position:fixed; inset:0;
+            background: linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.55)), url({% static 'img/bg.jpg' %}) center/cover no-repeat;
+            z-index:-1;
+        }
+    </style>
+
+
+    <!-- Tailwind (CDN для быстрого старта) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+
+    <!-- Фон страницы -->
+    <!-- Помощники: CSRF -->
+    <script>
+      function getCookie(name) {
+        const value = `; ${document.cookie}`
+        const parts = value.split(`; ${name}=`)
+        if (parts.length === 2) return parts.pop().split(';').shift()
+      }
+      const csrftoken = () => getCookie('csrftoken')
+    </script>
+
+    {% block head_extra %}
+    {% endblock %}
+  </head>
+  <body class="min-h-screen text-white">
+    <!-- Navbar -->
+    <header class="backdrop-blur bg-white/10 border-b border-white/20">
+      <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <a href="{% url 'home' %}" class="font-semibold tracking-wide">Avala</a>
+        <nav class="flex gap-4">
+          {% if request.user.is_authenticated %}
+            <span class="text-white/80">Привет, {{ request.user.username }}</span>
+            <form id="logoutForm" action="#" method="post" class="inline">
+              <button id="logoutBtn" class="px-3 py-1 rounded bg-white/10 hover:bg-white/20 border border-white/20">Выйти</button>
+            </form>
+          {% else %}
+            <a href="{% url 'login_page' %}" class="px-3 py-1 rounded bg-white/10 hover:bg-white/20 border border-white/20">Войти</a>
+          {% endif %}
+        </nav>
+      </div>
+    </header>
+
+    <!-- Контент -->
+    <main class="max-w-6xl mx-auto px-4 py-10">
+      {% block content %}
+      {% endblock %}
+    </main>
+
+    <script>
+      function apiUrl(path) {
+    // Берём текущий домен
+    const domain = window.location.origin;
+    // Возвращаем полный URL
+    return `${domain}/${path}`;
+  }
+      // AJAX logout (опционально)
+      $(document).on('click', '#logoutBtn', function (e) {
+        e.preventDefault()
+        $.ajax({
+          url: "{% url 'api_logout' %}",
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrftoken() },
+          success: function () {
+            window.location.href = "{% url 'home' %}"
+          },
+          error: function (xhr) {
+            alert('Ошибка выхода (' + xhr.status + ')')
+          }
+        })
+      })
+    </script>
+    {% block body_extra %}
+    {% endblock %}
+  </body>
+</html>

@@ -1,61 +1,43 @@
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.forms import UserCreationForm
-from django.shortcuts import render, redirect
-from apps.sklad.models import Venue
-from .models import User
-from django.contrib import messages
+from django.views.generic import TemplateView
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
 
-# Create your views here.
-def signup(request):
-    if request.method == 'POST':
-        form = UserCreationForm(request.POST)
-        if form.is_valid():
-            u = form.save()
-            login(request, u)
-            return redirect('choose_venue')
-    else:
-        form = UserCreationForm()
-    return render(request, 'signup.html', {'form': form})
+# --- Pages ---
+class HomePage(TemplateView):
+    template_name = "index.html"
 
-def choose_venue(request):
-    venues = Venue.objects.all()
-    if request.method == 'POST':
-        vid = request.POST.get('venue_id')
-        v = Venue.objects.get(id=vid)
-        # здесь можно сохранить выбранное в профиль через user.profile (или cookie)
-        request.user.profile.selected_venue_id = v.id
-        request.user.profile.save()
-        return redirect('dashboard')
-    return render(request, 'choose_venue.html', {'venues': venues})
+class LoginPage(TemplateView):
+    template_name = "login.html"
 
-def register_user(request):
-    if request.method == "POST":
-        username = request.POST["username"]
-        password = request.POST["password"]
-        if User.objects.filter(username=username).exists():
-            messages.error(request, "Такой пользователь уже существует")
-            return redirect("register")
-        user = User.objects.create_user(username=username, password=password)
-        login(request, user)
-        return redirect("dashboard")
-    return render(request, "register.html")
+class BanyaPage(TemplateView):
+    template_name = "banya_base.html"
 
-def login_user(request):
-    if request.method == "POST":
-        username = request.POST["username"]
-        password = request.POST["password"]
+class CafePage(TemplateView):
+    template_name = "cafe.html"
+
+# --- API ---
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = (request.data.get("username") or "").strip()
+        password = request.data.get("password") or ""
+        if not username or not password:
+            return Response({"detail": "Введите логин и пароль"}, status=status.HTTP_400_BAD_REQUEST)
+
         user = authenticate(request, username=username, password=password)
-        if user is not None:
-            login(request, user)
-            return redirect("dashboard")
-        else:
-            messages.error(request, "Неверный логин или пароль")
-            return redirect("login")
-    return render(request, "login.html")
+        if user is None:
+            return Response({"detail": "Неверный логин или пароль"}, status=status.HTTP_400_BAD_REQUEST)
 
-def logout_user(request):
-    logout(request)
-    return redirect("login")
+        login(request, user)  # сессия
+        return Response({"detail": "ok"}, status=status.HTTP_200_OK)
 
-def dashboard(request):
-    return render(request, "dashboard.html")
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        logout(request)
+        return Response({"detail": "ok"}, status=status.HTTP_200_OK)

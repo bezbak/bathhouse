@@ -1,0 +1,54 @@
+{% extends "banya_base.html" %}
+{% block banya_content %}
+<h1 class="text-2xl font-bold mb-6">Графики</h1>
+
+<div class="grid md:grid-cols-3 gap-6">
+  <div class="bg-white/10 border border-white/20 rounded-xl p-4">
+    <h2 class="text-lg mb-2">Расходы</h2>
+    <canvas id="expensesChart"></canvas>
+  </div>
+  <div class="bg-white/10 border border-white/20 rounded-xl p-4">
+    <h2 class="text-lg mb-2">Доходы</h2>
+    <canvas id="incomeChart"></canvas>
+  </div>
+  <div class="bg-white/10 border border-white/20 rounded-xl p-4">
+    <h2 class="text-lg mb-2">Прибыль</h2>
+    <canvas id="profitChart"></canvas>
+  </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  $.getJSON("{% url 'order-list' %}", function(data){
+    // Здесь лучше с бэка возвращать агрегированные суммы, но для примера:
+    const months = {};
+    data.forEach(o => {
+      const date = new Date(o.created_at);
+      const key = date.getFullYear()+"-"+(date.getMonth()+1);
+      if (!months[key]) months[key] = {income:0, expense:0};
+      months[key].income += o.total_price;
+      // расходы можно тянуть из закупок продуктов (упрощённо)
+    });
+
+    const labels = Object.keys(months);
+    const incomes = labels.map(l => months[l].income);
+    const expenses = labels.map(l => months[l].expense);
+    const profits = labels.map((l,i) => incomes[i]-expenses[i]);
+
+    new Chart(document.getElementById('expensesChart'), {
+      type: 'line',
+      data: {labels, datasets:[{label:"Расходы", data:expenses, borderColor:"red"}]}
+    });
+    new Chart(document.getElementById('incomeChart'), {
+      type: 'line',
+      data: {labels, datasets:[{label:"Доходы", data:incomes, borderColor:"green"}]}
+    });
+    new Chart(document.getElementById('profitChart'), {
+      type: 'line',
+      data: {labels, datasets:[{label:"Прибыль", data:profits, borderColor:"blue"}]}
+    });
+  });
+</script>
+{% endblock %}

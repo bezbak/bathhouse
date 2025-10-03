@@ -1,31 +1,42 @@
-from rest_framework import generics, filters
-from rest_framework.permissions import IsAuthenticated
-from .serializers import TimeSlotSerializer, ReservationSerializer, ClientSerializer
-from .models import Reservation, TimeSlot, Client
+from rest_framework import viewsets
+from django.views.generic import TemplateView
 
+from .models import Booking, Product, Client, Order
+from .serializers import BookingSerializer, ProductSerializer, ClientSerializer, OrderSerializer
+from .permissions import IsAdmin, IsManagerOrAdmin
+# --- Pages ---
+class ChessboardPage(TemplateView):
+    template_name = "banya_chessboard.html"
 
-class TimeSlotListCreate(generics.ListCreateAPIView):
-    queryset = TimeSlot.objects.all()
-    serializer_class = TimeSlotSerializer
-    permission_classes = [IsAuthenticated]
+class StoragePage(TemplateView):
+    template_name = "banya_storage.html"
 
+class ClientsPage(TemplateView):
+    template_name = "banya_clients.html"
 
-class ReservationList(generics.ListAPIView):
-    queryset = Reservation.objects.select_related(
-        'client', 'venue', 'timeslot').all()
-    serializer_class = ReservationSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['name', 'phone', 'client__phone']
+class ShopPage(TemplateView):
+    template_name = "banya_shop.html"
 
+class ChartsPage(TemplateView):
+    template_name = "banya_charts.html"
 
-class ReservationDetail(generics.RetrieveUpdateAPIView):
-    queryset = Reservation.objects.all()
-    serializer_class = ReservationSerializer
-    permission_classes = [IsAuthenticated]
+# --- API ---
+class BookingViewSet(viewsets.ModelViewSet):
+    queryset = Booking.objects.all()
+    serializer_class = BookingSerializer
+    permission_classes = [IsManagerOrAdmin]
 
+class ProductViewSet(viewsets.ModelViewSet):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [IsAdmin]
 
-class ClientsList(generics.ListAPIView):
+class ClientViewSet(viewsets.ModelViewSet):
     queryset = Client.objects.all()
     serializer_class = ClientSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdmin]
+
+class OrderViewSet(viewsets.ModelViewSet):
+    queryset = Order.objects.all()
+    serializer_class = OrderSerializer
+    permission_classes = [IsManagerOrAdmin]  # менеджеры и админы

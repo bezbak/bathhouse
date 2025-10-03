@@ -1,0 +1,76 @@
+{% extends "banya_base.html" %}
+{% block banya_content %}
+<h1 class="text-2xl font-bold mb-4">Магазин</h1>
+
+<form id="orderForm" class="space-y-4">
+  {% csrf_token %}
+
+  <div class="bg-white/10 p-4 rounded-xl">
+    <label class="block mb-2">Выбрать клиента или комнату</label>
+    <select id="clientRoomSelect" name="client_or_room"
+            class="w-full px-3 py-2 rounded bg-white/10 border border-white/20 text-white">
+      <option value="">-- выберите --</option>
+    </select>
+  </div>
+
+  <div class="bg-white/10 p-4 rounded-xl">
+    <label class="block mb-2">Продукты</label>
+    <div id="productList" class="grid md:grid-cols-2 gap-4"></div>
+  </div>
+
+  <button type="submit"
+          class="px-4 py-2 rounded bg-white/20 border border-white/30 hover:bg-white/30">
+    Сохранить заказ
+  </button>
+</form>
+
+<div id="orderMsg" class="mt-4 text-sm text-green-400 hidden">Заказ сохранён ✅</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+  // Подгрузка клиентов и комнат
+  $.getJSON("banya/api/v1/client", function(clients){
+    clients.forEach(c => {
+      $("#clientRoomSelect").append(`<option value="client-${c.id}">👤 ${c.name}</option>`);
+    });
+  });
+  // (если нужен API для комнат, тоже подключаем)
+
+  // Подгрузка продуктов
+  $.getJSON("banya/api/v1/product", function(products){
+    const container = $("#productList");
+    products.forEach(p => {
+      container.append(`
+        <label class="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/20">
+          <input type="checkbox" name="products" value="${p.id}" class="w-4 h-4" />
+          <span>${p.name} (${p.sale_price})</span>
+        </label>
+      `);
+    });
+  });
+
+  // Отправка заказа
+  $("#orderForm").on("submit", function(e){
+    e.preventDefault();
+    const payload = {
+      client_or_room: $("#clientRoomSelect").val(),
+      products: $("input[name='products']:checked").map(function(){return this.value;}).get()
+    };
+
+    $.ajax({
+      url: "api/v1/orders",
+      method: "POST",
+      data: JSON.stringify(payload),
+      contentType: "application/json",
+      headers: {"X-CSRFToken": csrftoken()},
+      success: function(){
+        $("#orderMsg").removeClass("hidden");
+      },
+      error: function(xhr){
+        alert("Ошибка сохранения заказа: "+xhr.status);
+      }
+    });
+  });
+</script>
+{% endblock %}

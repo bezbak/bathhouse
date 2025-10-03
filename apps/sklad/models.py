@@ -1,86 +1,73 @@
 from django.db import models
-from apps.users.models import User
 
-class Venue(models.Model):
-    TYPE_CHOICES = (('banya','Баня'), ('cafe','Кафе'))
-    name = models.CharField(max_length=200)
-    venue_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+class Room(models.Model):
+    name = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.name
+
+class Booking(models.Model):
+    STATUS_CHOICES = [
+        ("booked", "Забронировано"),
+        ("in_progress", "В процессе"),
+        ("done", "Завершено"),
+        ("canceled", "Отменено"),
+    ]
+
+    client_name = models.CharField(max_length=150)
+    phone_number = models.CharField(max_length=20)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="booked")
+    people_count = models.PositiveIntegerField(default=1)
+    arrival_time = models.DateTimeField()
+    room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.client_name} ({self.arrival_time})"
+    
+class Product(models.Model):
+    name = models.CharField(max_length=150)
     description = models.TextField(blank=True)
-    timezone = models.CharField(max_length=50, default='Asia/Bishkek')
-
-    def __str__(self):
-        return f"{self.name} ({self.get_venue_type_display()})"
-
-class TimeSlot(models.Model):
-    """
-    Описывает страницу со свободными местами.
-    Один слот = время начала + вместимость для конкретного заведения (например, 18:00-20:00)
-    """
-    venue = models.ForeignKey(Venue, on_delete=models.CASCADE, related_name='timeslots')
-    start = models.DateTimeField()
-    end = models.DateTimeField()
-    capacity = models.IntegerField(default=10)  # общее количество мест
-    description = models.CharField(max_length=255, blank=True)
-
-    class Meta:
-        ordering = ['start']
-        unique_together = ('venue','start','end')
-
-    def reserved_count(self):
-        return self.reservations.filter(status__in=['confirmed','arrived']).count()
-
-    def free_places(self):
-        return max(0, self.capacity - self.reserved_count())
-
-    def __str__(self):
-        return f"{self.venue.name} {self.start.isoformat()} ({self.free_places()}/{self.capacity})"
-
-class Client(models.Model):
-    name = models.CharField(max_length=255, blank=True, null=True)
-    phone = models.CharField(max_length=50, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def visits_count(self):
-        return self.orders.filter(status='completed').count() + self.reservations.filter(status='arrived').count()
-
-    def total_spent(self, period_start=None, period_end=None):
-        qs = self.orders.filter(status='completed')
-        if period_start:
-            qs = qs.filter(created_at__gte=period_start)
-        if period_end:
-            qs = qs.filter(created_at__lte=period_end)
-        return qs.aggregate(total=models.Sum('total_price'))['total'] or 0
-
-    def __str__(self):
-        return f"{self.name or self.phone} ({self.phone})"
-
-class Reservation(models.Model):
-    STATUS = (
-        ('new','new'),
-        ('confirmed','confirmed'),
-        ('cancelled','cancelled'),
-        ('arrived','arrived'),
-        ('no_show','no_show'),
+    supplier = models.CharField(max_length=150)
+    purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
+    purchase_unit = models.CharField(
+        max_length=20,
+        choices=[("piece", "за штуку"), ("kg", "за кг"), ("g", "за грамм")],
+        default="piece"
     )
-    venue = models.ForeignKey(Venue, on_delete=models.CASCADE, related_name='reservations')
-    timeslot = models.ForeignKey(TimeSlot, on_delete=models.SET_NULL, null=True, blank=True, related_name='reservations')
-    client = models.ForeignKey(Client, on_delete=models.SET_NULL, null=True, blank=True, related_name='reservations')
-    name = models.CharField(max_length=255, blank=True, null=True)
-    phone = models.CharField(max_length=50)
-    people = models.IntegerField(default=1)
-    requested_time = models.DateTimeField()  # точное время, которое прислал клиент
-    source = models.CharField(max_length=100, default='salebot')
-    status = models.CharField(max_length=20, choices=STATUS, default='new')
-    note = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    idempotency_key = models.CharField(max_length=200, blank=True, null=True, unique=True)
-
-    flagged = models.BooleanField(default=False)  # флаг от менеджера (или автоматический)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        # Можно здесь или сигналом проверять visits_count и создавать уведомление
+    sale_price = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity = models.PositiveIntegerField(default=0)
 
     def __str__(self):
-        return f"{self.venue.name} {self.requested_time} {self.name or self.phone}"
+        return self.name
+    
+class Client(models.Model):
+    name = models.CharField(max_length=150)
+    phone_number = models.CharField(max_length=20, unique=True)
+
+    def total_visits(self):
+        return Booking.objects.filter(phone_number=self.phone_number, status="done").count()
+
+    def total_spent(self):
+        orders = Order.objects.filter(client=self)
+        return sum(o.total_price for o in orders)
+
+    def __str__(self):
+        return f"{self.name} ({self.phone_number})"
+    
+class Order(models.Model):
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, null=True, blank=True)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def total_price(self):
+        return sum([i.total_price for i in self.items.all()])
+
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1)
+
+    @property
+    def total_price(self):
+        return self.quantity * self.product.sale_price

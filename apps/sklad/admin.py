@@ -1,4 +1,2 @@
 from django.contrib import admin
-from .models import Reservation
-# Register your models here.
-admin.site.register(Reservation)
+from .models import Room, Booking, Product, Client, Order
